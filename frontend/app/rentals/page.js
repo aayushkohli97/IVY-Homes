@@ -1,15 +1,38 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/providers';
+import { useAuth, useFav } from '@/lib/providers';
 import Navbar from '@/components/Navbar';
 import { fetchRentalsPage, formatPrice } from '@/lib/api';
 
 const LIMIT = 50;
 
-function RentalCard({ r }) {
+function HeartIcon({ filled }) {
   return (
-    <article className="glass-card rental-card animate-in" style={{ padding: 20 }}>
+    <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill={filled ? 'currentColor' : 'none'}>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
+  );
+}
+
+function RentalCard({ r }) {
+  const { favIds, toggleFav } = useFav();
+  const router = useRouter();
+  
+  const isFav = favIds.has(r.listing_id);
+
+  function handleFav(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFav(r);
+  }
+
+  return (
+    <article 
+      className="glass-card rental-card animate-in" 
+      style={{ padding: 20, cursor: 'pointer', position: 'relative' }}
+      onClick={() => router.push(`/listing/${r.listing_id}`)}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div className="rental-card__rent">
@@ -28,9 +51,14 @@ function RentalCard({ r }) {
             📍 {r.locality}
           </div>
         </div>
-        <span className={`badge ${r.is_live ? 'badge-cyan' : 'badge-red'}`}>
-          {r.is_live ? 'Live' : 'Offline'}
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className={`badge ${r.is_live ? 'badge-cyan' : 'badge-red'}`}>
+            {r.is_live ? 'Live' : 'Offline'}
+          </span>
+          <button onClick={handleFav} className="btn btn-ghost" style={{ padding: 8, color: isFav ? '#ec4899' : 'var(--text-secondary)' }}>
+            <HeartIcon filled={isFav} />
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 14, fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -89,19 +117,34 @@ export default function RentalsPage() {
   const fetchPage = useCallback(async (off, reset = false) => {
     if (loading) return;
     setLoading(true);
+    
+    let currentOffset = off;
+    let accumulated = [];
+    let serverHasMore = true;
+
     try {
-      const data = await fetchRentalsPage({ offset: off, limit: LIMIT });
-      let results = data.results || data.data || [];
+      let loops = 0;
+      while (loops < 4 && serverHasMore) {
+        const data = await fetchRentalsPage({ offset: currentOffset, limit: LIMIT });
+        let results = data.results || data.data || [];
 
-      // Defensive client-side filter
-      if (bedroomFilter)  results = results.filter(r => String(r.bedroom) === bedroomFilter);
-      if (localityFilter) results = results.filter(r => r.locality?.toLowerCase() === localityFilter.toLowerCase());
+        // Defensive client-side filter
+        if (bedroomFilter)  results = results.filter(r => String(r.bedroom) === bedroomFilter);
+        if (localityFilter) results = results.filter(r => r.locality?.toLowerCase() === localityFilter.toLowerCase());
 
-      if (reset) setRentals(results);
-      else       setRentals(prev => [...prev, ...results]);
+        accumulated = [...accumulated, ...results];
+        serverHasMore = (data.results || data.data || []).length === LIMIT;
+        currentOffset += LIMIT;
+        loops++;
+        
+        if (accumulated.length > 0) break;
+      }
 
-      setHasMore((data.results || data.data || []).length === LIMIT);
-      setOffset(off + LIMIT);
+      if (reset) setRentals(accumulated);
+      else       setRentals(prev => [...prev, ...accumulated]);
+
+      setHasMore(serverHasMore);
+      setOffset(currentOffset);
     } catch {
       setHasMore(false);
     } finally {

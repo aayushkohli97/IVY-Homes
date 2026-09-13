@@ -23,7 +23,7 @@ export function AppProviders({ children }) {
     if (!user) { setFavIds(new Set()); return; }
     fetchFavourites()
       .then(data => {
-        const ids = (data.data || data || []).map(f => f.listing_id || f.id);
+        const ids = (data.data || data || []).map(f => f.listing_id || f.project_id || f.id);
         setFavIds(new Set(ids));
       })
       .catch(() => {});
@@ -38,24 +38,25 @@ export function AppProviders({ children }) {
     window.location.href = '/login';
   }, []);
 
-  const toggleFav = useCallback(async (listing_id) => {
-    const isFav = favIds.has(listing_id);
+  const toggleFav = useCallback(async (item) => {
+    const id = typeof item === 'string' ? item : (item.listing_id || item.project_id);
+    const isFav = favIds.has(id);
     // Optimistic update
     setFavIds(prev => {
       const next = new Set(prev);
-      if (isFav) next.delete(listing_id);
-      else        next.add(listing_id);
+      if (isFav) next.delete(id);
+      else        next.add(id);
       return next;
     });
     try {
-      if (isFav) await removeFavourite(listing_id);
-      else       await addFavourite(listing_id);
+      if (isFav) await removeFavourite(id);
+      else       await addFavourite(typeof item === 'string' ? { listing_id: item } : item);
     } catch {
       // revert
       setFavIds(prev => {
         const next = new Set(prev);
-        if (isFav) next.add(listing_id);
-        else       next.delete(listing_id);
+        if (isFav) next.add(id);
+        else       next.delete(id);
         return next;
       });
     }

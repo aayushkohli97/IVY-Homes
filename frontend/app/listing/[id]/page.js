@@ -67,7 +67,8 @@ export default function ListingDetailPage() {
     </>
   );
 
-  const isFav  = favIds.has(listing.listing_id);
+  const idToCheck = listing.listing_id || listing.project_id;
+  const isFav  = favIds.has(idToCheck);
   const area   = normaliseSqft(listing.carpet_area);
   const sbuArea = normaliseSqft(listing.super_built_up_area);
   const price  = formatPrice(listing.price);
@@ -139,9 +140,9 @@ export default function ListingDetailPage() {
                 </p>
               </div>
               <button
-                id={`fav-btn-detail-${listing.listing_id}`}
+                id={`fav-btn-detail-${idToCheck}`}
                 className={`btn ${isFav ? 'btn-danger' : 'btn-ghost'}`}
-                onClick={() => toggleFav(listing.listing_id)}
+                onClick={() => toggleFav(listing)}
                 style={{ flexShrink: 0, color: isFav ? '#ec4899' : undefined }}
               >
                 <HeartIcon filled={isFav} />

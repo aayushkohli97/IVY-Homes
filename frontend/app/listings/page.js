@@ -26,7 +26,32 @@ export default function ListingsPage() {
   const [furnishing, setFurnishing] = useState('');
   const [priceMin,   setPriceMin]   = useState('');
   const [priceMax,   setPriceMax]   = useState('');
+  const [priceError, setPriceError] = useState('');
   const [searchText, setSearchText] = useState('');
+  
+  const loadingRef = useRef(false);
+
+  const handlePriceMinChange = (val) => {
+    if (val !== '' && Number(val) < 0) {
+      setPriceError('Enter valid number');
+    } else if (priceMax !== '' && Number(priceMax) < 0) {
+      setPriceError('Enter valid number');
+    } else {
+      setPriceError('');
+    }
+    setPriceMin(val);
+  };
+
+  const handlePriceMaxChange = (val) => {
+    if (val !== '' && Number(val) < 0) {
+      setPriceError('Enter valid number');
+    } else if (priceMin !== '' && Number(priceMin) < 0) {
+      setPriceError('Enter valid number');
+    } else {
+      setPriceError('');
+    }
+    setPriceMax(val);
+  };
 
   // Data state
   const [listings, setListings] = useState([]);
@@ -45,12 +70,14 @@ export default function ListingsPage() {
 
   // Defensive client-side filter
   const applyClientFilter = useCallback((data) => {
-    let out = data;
+    // Unconditionally filter out corrupted listings (negative or zero price)
+    let out = data.filter(l => l.price > 0);
+    
     if (bedroom)    out = out.filter(l => String(l.bedroom) === bedroom);
     if (furnishing) out = out.filter(l => l.furnishing === furnishing);
     if (locality)   out = out.filter(l => l.locality?.toLowerCase() === locality.toLowerCase());
-    if (priceMin)   out = out.filter(l => l.price >= Number(priceMin));
-    if (priceMax)   out = out.filter(l => l.price <= Number(priceMax));
+    if (priceMin && Number(priceMin) >= 0)   out = out.filter(l => l.price >= Number(priceMin));
+    if (priceMax && Number(priceMax) >= 0)   out = out.filter(l => l.price <= Number(priceMax));
     if (searchText) {
       const q = searchText.toLowerCase();
       out = out.filter(l =>
@@ -64,53 +91,78 @@ export default function ListingsPage() {
 
   // Fetch a page
   const fetchPage = useCallback(async (off, reset = false) => {
-    if (loading) return;
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
-    try {
-      const data = await fetchListingsPage({ offset: off, limit: LIMIT, locality, bedroom, furnishing });
-      const results = data.results || data.data || [];
-      const filtered = applyClientFilter(results);
+    
+    let currentOffset = off;
+    let accumulated = [];
+    let serverHasMore = true;
+    let currentTotal = null;
 
-      if (reset) {
-        setListings(filtered);
-        setTotal(data.total || null);
-      } else {
-        setListings(prev => [...prev, ...filtered]);
+    try {
+      // Fetch up to 4 pages at once if client-side filter is stripping everything out
+      let loops = 0;
+      while (loops < 4 && serverHasMore) {
+        const data = await fetchListingsPage({ offset: currentOffset, limit: LIMIT, locality, bedroom, furnishing });
+        const results = data.results || data.data || [];
+        const filtered = applyClientFilter(results);
+
+        accumulated = [...accumulated, ...filtered];
+        serverHasMore = results.length === LIMIT;
+        currentOffset += LIMIT;
+        currentTotal = data.total || null;
+        loops++;
+        
+        if (accumulated.length > 0) break;
       }
 
-      setHasMore(results.length === LIMIT);
-      setOffset(off + LIMIT);
+      if (reset) {
+        setListings(accumulated);
+        setTotal(currentTotal);
+      } else {
+        setListings(prev => [...prev, ...accumulated]);
+      }
+
+      setHasMore(serverHasMore);
+      setOffset(currentOffset);
     } catch {
       setHasMore(false);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, [loading, locality, bedroom, furnishing, applyClientFilter]);
+  }, [locality, bedroom, furnishing, applyClientFilter]);
 
-  // Initial / filter-change load
-  useEffect(() => {
+  // Handle explicit search button click
+  const handleSearch = () => {
     setListings([]);
     setOffset(0);
     setHasMore(true);
     fetchPage(0, true);
+  };
+
+  // Initial load ONLY on mount
+  useEffect(() => {
+    handleSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locality, bedroom, furnishing, priceMin, priceMax, searchText]);
+  }, []);
 
   // Intersection observer for infinite scroll
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && hasMore && !loading) fetchPage(offset); },
+      ([entry]) => { if (entry.isIntersecting && hasMore && !loadingRef.current) fetchPage(offset); },
       { rootMargin: '200px' }
     );
     obs.observe(sentinel);
     return () => obs.disconnect();
-  }, [hasMore, loading, offset, fetchPage]);
+  }, [hasMore, offset, fetchPage]);
 
   function resetFilters() {
     setLocality(''); setBedroom(''); setFurnishing('');
-    setPriceMin(''); setPriceMax(''); setSearchText('');
+    setPriceMin(''); setPriceMax(''); setSearchText(''); setPriceError('');
   }
 
   if (!user) return null;
@@ -123,9 +175,9 @@ export default function ListingsPage() {
         <aside className="filters-sidebar glass-card">
           <h3>Filters</h3>
 
-          {/* Search */}
+          {/* Search Text */}
           <div className="filter-group">
-            <label htmlFor="search-input">Search</label>
+            <label htmlFor="search-input">Text Search</label>
             <input
               id="search-input"
               className="input"
@@ -186,14 +238,35 @@ export default function ListingsPage() {
           {/* Price range */}
           <div className="filter-group">
             <label>Price Range (₹)</label>
+            {priceError && (
+              <div
+                className="price-alert"
+                style={{
+                  color: '#ff4d4d',
+                  backgroundColor: 'rgba(255, 77, 77, 0.1)',
+                  border: '1px solid rgba(255, 77, 77, 0.3)',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                ⚠️ {priceError}
+              </div>
+            )}
             <div className="price-range-inputs">
               <input
                 id="price-min"
                 className="input"
                 type="number"
+                min="0"
                 placeholder="Min"
                 value={priceMin}
-                onChange={e => setPriceMin(e.target.value)}
+                onChange={e => handlePriceMinChange(e.target.value)}
                 style={{ padding: '10px 12px' }}
               />
               <span>–</span>
@@ -201,26 +274,38 @@ export default function ListingsPage() {
                 id="price-max"
                 className="input"
                 type="number"
+                min="0"
                 placeholder="Max"
                 value={priceMax}
-                onChange={e => setPriceMax(e.target.value)}
+                onChange={e => handlePriceMaxChange(e.target.value)}
                 style={{ padding: '10px 12px' }}
               />
             </div>
           </div>
 
-          <button
-            id="reset-filters-btn"
-            className="btn btn-ghost w-full"
-            onClick={resetFilters}
-            style={{ justifyContent: 'center' }}
-          >
-            Reset Filters
-          </button>
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+            <button
+              className="btn btn-primary w-full"
+              onClick={handleSearch}
+              disabled={!!priceError || loading}
+              style={{ justifyContent: 'center', fontSize: 16, padding: '12px', opacity: priceError ? 0.5 : 1, cursor: priceError ? 'not-allowed' : 'pointer' }}
+            >
+              🔍 Search
+            </button>
+            <button
+              id="reset-filters-btn"
+              className="btn btn-ghost w-full"
+              onClick={resetFilters}
+              style={{ justifyContent: 'center' }}
+            >
+              Reset Filters
+            </button>
+          </div>
         </aside>
 
         {/* ── Grid ── */}
-        <section>
+        <section style={{ position: 'relative' }}>
           {/* Header */}
           <div className="listings-header">
             <p className="listings-count">
@@ -229,8 +314,15 @@ export default function ListingsPage() {
             </p>
           </div>
 
+          {/* Main Loader for new searches */}
+          {loading && listings.length === 0 && (
+            <div style={{ padding: '60px 0', display: 'flex', justifyContent: 'center' }}>
+              <div className="spinner" style={{ width: 48, height: 48, borderWidth: 4 }}></div>
+            </div>
+          )}
+
           {/* Cards */}
-          {listings.length === 0 && !loading && (
+          {listings.length === 0 && !loading && !hasMore && (
             <div className="empty-state" style={{ gridColumn: '1/-1' }}>
               <span style={{ fontSize: 48 }}>🏚️</span>
               <h3>No listings found</h3>
@@ -243,19 +335,14 @@ export default function ListingsPage() {
             {listings.map(l => (
               <PropertyCard key={l.listing_id} listing={l} />
             ))}
-
-            {/* Skeleton cards while loading */}
-            {loading && Array.from({ length: 6 }).map((_, i) => (
-              <div key={`sk-${i}`} className="property-card" style={{ overflow: 'hidden' }}>
-                <div className="skeleton" style={{ height: 190 }} />
-                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div className="skeleton" style={{ height: 26, width: '60%' }} />
-                  <div className="skeleton" style={{ height: 16, width: '80%' }} />
-                  <div className="skeleton" style={{ height: 14, width: '50%' }} />
-                </div>
-              </div>
-            ))}
           </div>
+
+          {/* Small loader at bottom for infinite scroll
+          {loading && listings.length > 0 && (
+            <div style={{ padding: '24px', display: 'flex', justifyContent: 'center' }}>
+              <div className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }}></div>
+            </div>
+          )} */}
 
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="sentinel" />

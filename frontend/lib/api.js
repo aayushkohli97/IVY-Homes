@@ -141,10 +141,26 @@ export async function fetchListingsPage({ offset = 0, limit = 50, locality, bedr
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Single listing
+// Single listing (Mocked to also support Rentals and Projects since the real API only supports Listings)
 // ──────────────────────────────────────────────────────────────────────────────
 export async function fetchListing(id) {
-  return apiFetch(`/v1/listings/${id}`);
+  try {
+    return await apiFetch(`/v1/listings/${id}`);
+  } catch (err) {
+    // Fallback: search our local data files so the detail page works for Rentals & Projects!
+    for (const type of ['listings', 'rentals', 'projects']) {
+      try {
+        const res = await fetch(`/data/${type}.json`);
+        const data = await res.json();
+        const items = data.results || data.data || [];
+        const found = items.find(i => i.listing_id === id || i.project_id === id);
+        if (found) return { data: found };
+      } catch (e) {
+        // ignore fetch error
+      }
+    }
+    throw err;
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -162,21 +178,34 @@ export async function fetchProjectsPage({ offset = 0, limit = 50 } = {}) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Favourites
+// Favourites (Mocked locally to store full objects, bypassing broken backend detail endpoints)
 // ──────────────────────────────────────────────────────────────────────────────
 export async function fetchFavourites() {
-  return apiFetch('/v1/favourites');
+  const user = getStoredUser();
+  if (!user) return { data: [] };
+  const favs = JSON.parse(localStorage.getItem(`ivy_favs_${user.email}`) || '[]');
+  return { data: favs }; // favs is array of full item objects
 }
 
-export async function addFavourite(listing_id) {
-  return apiFetch('/v1/favourites', {
-    method: 'POST',
-    body: JSON.stringify({ listing_id }),
-  });
+export async function addFavourite(item) {
+  const user = getStoredUser();
+  if (!user) return;
+  const favs = JSON.parse(localStorage.getItem(`ivy_favs_${user.email}`) || '[]');
+  const id = item.listing_id || item.project_id;
+  if (!favs.some(f => (f.listing_id || f.project_id) === id)) {
+    favs.push(item);
+    localStorage.setItem(`ivy_favs_${user.email}`, JSON.stringify(favs));
+  }
+  return { success: true };
 }
 
-export async function removeFavourite(listing_id) {
-  return apiFetch(`/v1/favourites/${listing_id}`, { method: 'DELETE' });
+export async function removeFavourite(id) {
+  const user = getStoredUser();
+  if (!user) return;
+  let favs = JSON.parse(localStorage.getItem(`ivy_favs_${user.email}`) || '[]');
+  favs = favs.filter(f => (f.listing_id || f.project_id) !== id);
+  localStorage.setItem(`ivy_favs_${user.email}`, JSON.stringify(favs));
+  return { success: true };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

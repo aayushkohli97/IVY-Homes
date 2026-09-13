@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/providers';
+import { useAuth, useFav } from '@/lib/providers';
 import Navbar from '@/components/Navbar';
 import { fetchProjectsPage, normaliseProjectPrice, formatPrice } from '@/lib/api';
 
@@ -13,7 +13,26 @@ const STATUS_BADGE = {
   'new launch':        'badge-purple',
 };
 
+function HeartIcon({ filled }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill={filled ? 'currentColor' : 'none'}>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
+  );
+}
+
 function ProjectCard({ p }) {
+  const { favIds, toggleFav } = useFav();
+  const router = useRouter();
+  
+  const isFav = favIds.has(p.project_id);
+
+  function handleFav(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFav(p);
+  }
+
   // Convert prices from Crores/Lakhs to rupees (defensive normalisation)
   const priceMin = normaliseProjectPrice(p.price_min);
   const priceMax = normaliseProjectPrice(p.price_max);
@@ -22,17 +41,26 @@ function ProjectCard({ p }) {
     : '—';
 
   return (
-    <article className="glass-card project-card animate-in">
+    <article 
+      className="glass-card project-card animate-in"
+      style={{ cursor: 'pointer', position: 'relative' }}
+      onClick={() => router.push(`/listing/${p.project_id}`)}
+    >
       {/* Status badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <span className={`badge ${STATUS_BADGE[p.project_status] || 'badge-cyan'}`} style={{ textTransform: 'capitalize' }}>
           {p.project_status}
         </span>
-        {p.rera_number && (
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-            RERA: {p.rera_number.split('/').pop()}
-          </span>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {p.rera_number && (
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              RERA: {p.rera_number.split('/').pop()}
+            </span>
+          )}
+          <button onClick={handleFav} className="btn btn-ghost" style={{ padding: 8, color: isFav ? '#ec4899' : 'var(--text-secondary)' }}>
+            <HeartIcon filled={isFav} />
+          </button>
+        </div>
       </div>
 
       <div className="project-card__name">{p.apartment_name}</div>
@@ -95,19 +123,34 @@ export default function ProjectsPage() {
   const fetchPage = useCallback(async (off, reset = false) => {
     if (loading) return;
     setLoading(true);
+    
+    let currentOffset = off;
+    let accumulated = [];
+    let serverHasMore = true;
+
     try {
-      const data = await fetchProjectsPage({ offset: off, limit: LIMIT });
-      let results = data.results || data.data || [];
+      let loops = 0;
+      while (loops < 4 && serverHasMore) {
+        const data = await fetchProjectsPage({ offset: currentOffset, limit: LIMIT });
+        let results = data.results || data.data || [];
 
-      // Defensive client-side filter
-      if (statusFilter)   results = results.filter(p => p.project_status === statusFilter);
-      if (localityFilter) results = results.filter(p => p.locality?.toLowerCase() === localityFilter.toLowerCase());
+        // Defensive client-side filter
+        if (statusFilter)   results = results.filter(p => p.project_status === statusFilter);
+        if (localityFilter) results = results.filter(p => p.locality?.toLowerCase() === localityFilter.toLowerCase());
 
-      if (reset) setProjects(results);
-      else       setProjects(prev => [...prev, ...results]);
+        accumulated = [...accumulated, ...results];
+        serverHasMore = (data.results || data.data || []).length === LIMIT;
+        currentOffset += LIMIT;
+        loops++;
+        
+        if (accumulated.length > 0) break;
+      }
 
-      setHasMore((data.results || data.data || []).length === LIMIT);
-      setOffset(off + LIMIT);
+      if (reset) setProjects(accumulated);
+      else       setProjects(prev => [...prev, ...accumulated]);
+
+      setHasMore(serverHasMore);
+      setOffset(currentOffset);
     } catch {
       setHasMore(false);
     } finally {

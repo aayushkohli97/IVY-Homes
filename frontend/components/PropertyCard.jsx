@@ -55,7 +55,7 @@ export default function PropertyCard({ listing }) {
   function handleFav(e) {
     e.preventDefault();
     e.stopPropagation();
-    toggleFav(listing.listing_id);
+    toggleFav(listing);
   }
 
   return (
