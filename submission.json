@@ -1,0 +1,183 @@
+{
+  "api_key": "IVY26-01F5888E9D57",
+  "candidate": {
+    "name": "Aayush Kohli",
+    "email": "aayush.kohli@mnnit.ac.in",
+    "repo_url": "https://github.com/aayushkohli/ivy-homes-assignment",
+    "demo_url": "https://ivy-homes-frontend.vercel.app"
+  },
+  "answers": {
+    "total_listing_records": 4400,
+    "unique_properties": 4354,
+    "active_listings": 3477,
+    "corrupt_listing_ids": [
+      "100-2000330",
+      "100-2000571",
+      "100-2001154",
+      "100-2002483",
+      "100-2002618",
+      "DWE-2001261",
+      "DWE-2002997",
+      "DWE-2003348",
+      "MAG-2000670",
+      "MAG-2002071",
+      "MAG-2002456",
+      "MAG-2002624",
+      "MAG-2002914",
+      "SQU-2001338",
+      "SQU-2001615",
+      "SQU-2001685",
+      "SQU-2001910",
+      "SQU-2002038",
+      "SQU-2002386",
+      "SQU-2002576",
+      "SQU-2003252",
+      "ZER-2001183",
+      "ZER-2001221",
+      "ZER-2001292",
+      "ZER-2001308",
+      "ZER-2001710",
+      "ZER-2001864",
+      "ZER-2001930",
+      "ZER-2002492",
+      "ZER-2002789"
+    ],
+    "total_monthly_rent": 5978500,
+    "avg_price_per_sqft_2bhk": 10003.48,
+    "costliest_project": {
+      "project_id": "P20384",
+      "price_max_inr": 41500000
+    },
+    "listings_last_7_days": 141,
+    "fake_listing_ids": [
+      "100-2000006",
+      "100-2001069",
+      "100-2002851",
+      "DWE-2000195",
+      "DWE-2002396",
+      "DWE-2004066",
+      "MAG-2001236",
+      "MAG-2001533",
+      "MAG-2002761",
+      "MAG-2003644",
+      "MAG-2003816",
+      "SQU-2000238",
+      "SQU-2000270",
+      "SQU-2001249",
+      "SQU-2001425",
+      "ZER-2001598",
+      "ZER-2002241"
+    ],
+    "projects_with_wrong_listing_count": 363
+  },
+  "findings": [
+    {
+      "endpoint": "*",
+      "category": "auth",
+      "documented": "Append it as a query parameter: GET /v1/listings?api_key=IVY26-XXXXXXXXXXXX",
+      "actual": "API requires the key to be sent in the X-API-Key request header, not as a query parameter.",
+      "how_found": "The /v1/listings endpoint returned a 401 error explicitly instructing to use the X-API-Key header.",
+      "impact": "Authentication failed until the request headers were fixed.",
+      "evidence": []
+    },
+    {
+      "endpoint": "/auth/login",
+      "category": "auth",
+      "documented": "Tokens are valid for 24 hours, so a single login is enough... There is no refresh flow.",
+      "actual": "Tokens expire in 15 minutes (expires_in: 900). The response includes a refresh_token and refresh_url, contradicting the lack of a refresh flow.",
+      "how_found": "Observed the actual JSON response body of /auth/login.",
+      "impact": "Frontend must implement a token refresh mechanism to keep the user logged in for more than 15 minutes.",
+      "evidence": []
+    },
+    {
+      "endpoint": "*",
+      "category": "pagination",
+      "documented": "Every collection endpoint takes page and limit... Maximum 200",
+      "actual": "The limit parameter is capped at 50 server-side. The pagination uses offset and limit, not page and limit.",
+      "how_found": "Requested limit=200 but received only 50 records. Using the 'page' parameter had no effect on the results, but 'offset' worked.",
+      "impact": "Client must implement offset-based pagination and fetch in batches of 50.",
+      "evidence": []
+    },
+    {
+      "endpoint": "*",
+      "category": "pagination",
+      "documented": "total is the exact number of records matching your filters",
+      "actual": "The total count returned by the API is artificially capped or incorrect (e.g., reported 4171 but there are 4400 actual records).",
+      "how_found": "Fetches beyond the reported total continued to return valid, distinct records until exactly 4400.",
+      "impact": "Fetching logic cannot rely on total to determine when to stop pagination; must wait for an empty array.",
+      "evidence": []
+    },
+    {
+      "endpoint": "/v1/projects",
+      "category": "units",
+      "documented": "Money: Indian rupees, integer, everywhere in the API",
+      "actual": "price_min and price_max in /v1/projects are floats representing Lakhs (if > 20) or Crores (if < 20), not integer rupees.",
+      "how_found": "Observed float values like 1.21 and 65.2 for project prices, which logically correspond to Crores and Lakhs respectively.",
+      "impact": "Client must convert these values back to standard INR integers for accurate calculations.",
+      "evidence": [
+        "P20001",
+        "P20002"
+      ]
+    },
+    {
+      "endpoint": "/v1/listings",
+      "category": "units",
+      "documented": "Area: Square feet, integer, everywhere in the API",
+      "actual": "Some records report carpet_area and super_built_up_area in Square Meters instead of Square Feet.",
+      "how_found": "Identified 3BHK listings with carpet areas around 105, which is impossible in sqft but perfectly translates to ~1130 sqft from sqm.",
+      "impact": "Area values must be dynamically converted from sqm to sqft for accurate price-per-sqft computations.",
+      "evidence": [
+        "MAG-2001953",
+        "MAG-2000209"
+      ]
+    },
+    {
+      "endpoint": "*",
+      "category": "timestamps",
+      "documented": "ISO 8601, UTC, Z suffix, everywhere in the API",
+      "actual": "The posted_at fields have no Z suffix and represent Indian Standard Time (IST) local time.",
+      "how_found": "Observed posted_at strings like '2026-08-29T20:53:00' missing the documented 'Z' UTC designator.",
+      "impact": "Parsing dates without accounting for IST results in a 5.5 hour offset error.",
+      "evidence": [
+        "MAG-2001953",
+        "ZER-2003858"
+      ]
+    },
+    {
+      "endpoint": "/v1/listing/{id}",
+      "category": "missing_endpoint",
+      "documented": "A single listing.",
+      "actual": "Returns a 404 error. The endpoint does not exist at this path.",
+      "how_found": "Tested the endpoint with a valid listing ID and received a 404 response.",
+      "impact": "Forced to find the correct undocumented path.",
+      "evidence": []
+    },
+    {
+      "endpoint": "/v1/listings/{id}",
+      "category": "undocumented_endpoint",
+      "documented": "Not documented.",
+      "actual": "This is the correct endpoint for retrieving a single listing.",
+      "how_found": "Guessed the pluralized path after /v1/listing/{id} failed, and it successfully returned a 200 with the listing data.",
+      "impact": "Client must use this undocumented path for listing detail pages.",
+      "evidence": []
+    },
+    {
+      "endpoint": "/v1/listings/{id}/similar",
+      "category": "missing_endpoint",
+      "documented": "Up to ten comparable listings...",
+      "actual": "Returns a 404 error. This endpoint was never shipped.",
+      "how_found": "Pinged the endpoint directly with a valid listing ID.",
+      "impact": "Cannot display 'similar properties' natively using this endpoint.",
+      "evidence": []
+    },
+    {
+      "endpoint": "/v1/analytics/summary",
+      "category": "missing_endpoint",
+      "documented": "Pre-computed aggregates for your city",
+      "actual": "Returns a 404 error. The analytics endpoint does not exist.",
+      "how_found": "Pinged the endpoint directly.",
+      "impact": "All insights and summary data must be manually computed on the frontend from the raw collection data.",
+      "evidence": []
+    }
+  ]
+}
