@@ -1,6 +1,6 @@
 
-const BASE_URL = 'https://solve.ivy.homes';
-const API_KEY = 'IVY26-01F5888E9D57';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://solve.ivy.homes';
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Token management (stored in localStorage, silently refreshed)

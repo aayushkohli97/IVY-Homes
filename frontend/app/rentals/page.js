@@ -30,8 +30,7 @@ function RentalCard({ r }) {
   return (
     <article 
       className="glass-card rental-card animate-in" 
-      style={{ padding: 20, cursor: 'pointer', position: 'relative' }}
-      onClick={() => router.push(`/listing/${r.listing_id}`)}
+      style={{ padding: 20, position: 'relative' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -141,7 +140,10 @@ export default function RentalsPage() {
       }
 
       if (reset) setRentals(accumulated);
-      else       setRentals(prev => [...prev, ...accumulated]);
+      else       setRentals(prev => {
+        const existing = new Set(prev.map(r => r.listing_id));
+        return [...prev, ...accumulated.filter(r => !existing.has(r.listing_id))];
+      });
 
       setHasMore(serverHasMore);
       setOffset(currentOffset);

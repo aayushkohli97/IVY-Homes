@@ -43,8 +43,7 @@ function ProjectCard({ p }) {
   return (
     <article 
       className="glass-card project-card animate-in"
-      style={{ cursor: 'pointer', position: 'relative' }}
-      onClick={() => router.push(`/listing/${p.project_id}`)}
+      style={{ position: 'relative' }}
     >
       {/* Status badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -147,7 +146,10 @@ export default function ProjectsPage() {
       }
 
       if (reset) setProjects(accumulated);
-      else       setProjects(prev => [...prev, ...accumulated]);
+      else       setProjects(prev => {
+        const existing = new Set(prev.map(p => p.project_id));
+        return [...prev, ...accumulated.filter(p => !existing.has(p.project_id))];
+      });
 
       setHasMore(serverHasMore);
       setOffset(currentOffset);
