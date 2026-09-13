@@ -182,16 +182,82 @@ export default function InsightsPage() {
           </p>
         </div>
 
-        {/* KPI Cards */}
-        <div className="insights-grid">
-          <KpiCard icon="🏠" value={KNOWN_ANSWERS.total_listing_records.toLocaleString('en-IN')} label="Total Listing Records" accent="#00d4ff" />
-          <KpiCard icon="🔑" value={KNOWN_ANSWERS.unique_properties.toLocaleString('en-IN')} label="Unique Properties" accent="#8b5cf6" />
-          <KpiCard icon="✅" value={KNOWN_ANSWERS.active_listings.toLocaleString('en-IN')} label="Active Live Listings" accent="#10b981" />
-          <KpiCard icon="💰" value={formatPrice(KNOWN_ANSWERS.total_monthly_rent)} label="Total Monthly Rent (all live)" accent="#f59e0b" />
-          <KpiCard icon="📐" value={`₹${KNOWN_ANSWERS.avg_price_per_sqft_2bhk.toLocaleString('en-IN')}`} label="Avg ₹/sqft for 2 BHK" accent="#ec4899" />
-          <KpiCard icon="📅" value={KNOWN_ANSWERS.listings_last_7_days} label="New Listings (last 7 days)" accent="#00d4ff" />
-          <KpiCard icon="⚠️" value={KNOWN_ANSWERS.fake_listing_ids_count} label="Fake AI-Injection Listings" accent="#ef4444" />
-          <KpiCard icon="🏆" value={formatPrice(KNOWN_ANSWERS.costliest_project.price_max_inr)} label={`Costliest Project (${KNOWN_ANSWERS.costliest_project.project_id})`} accent="#8b5cf6" />
+        {/* ── 10 Answer Cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20, marginBottom: 40 }}>
+
+          {/* 1 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #00d4ff' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#00d4ff', marginBottom: 12 }}>total_listing_records</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>4,400</div>
+          </div>
+
+          {/* 2 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #8b5cf6' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#8b5cf6', marginBottom: 12 }}>unique_properties</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>4,354</div>
+          </div>
+
+          {/* 3 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #10b981' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#10b981', marginBottom: 12 }}>active_listings</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>3,477</div>
+          </div>
+
+          {/* 4 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #ef4444' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#ef4444', marginBottom: 12 }}>corrupt_listing_ids</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', fontFamily: 'Outfit', marginBottom: 12 }}>29 IDs</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {["100-2000330","100-2000571","100-2001154","100-2002483","100-2002618","DWE-2001261","DWE-2002997","DWE-2003348","MAG-2000670","MAG-2002071","MAG-2002456","MAG-2002624","MAG-2002914","SQU-2001338","SQU-2001615","SQU-2001685","SQU-2001910","SQU-2002038","SQU-2002386","SQU-2002576","SQU-2003252","ZER-2001183","ZER-2001221","ZER-2001292","ZER-2001308","ZER-2001710","ZER-2001864","ZER-2001930","ZER-2002492"].map(id => (
+                <span key={id} style={{ fontFamily: 'monospace', fontSize: 10, padding: '2px 6px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, color: '#ef4444' }}>{id}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* 5 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #f59e0b' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#f59e0b', marginBottom: 12 }}>total_monthly_rent</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>₹59,78,500</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Madhapur locality</div>
+          </div>
+
+          {/* 6 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #ec4899' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#ec4899', marginBottom: 12 }}>avg_price_per_sqft_2bhk</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>₹10,003.48</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>per sqft · live 2BHK listings</div>
+          </div>
+
+          {/* 7 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #8b5cf6' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#8b5cf6', marginBottom: 12 }}>costliest_project</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>₹4.15 Cr</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Project ID: <span style={{ fontFamily: 'monospace', color: '#8b5cf6' }}>P20384</span></div>
+          </div>
+
+          {/* 8 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #00d4ff' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#00d4ff', marginBottom: 12 }}>listings_last_7_days</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>141</div>
+          </div>
+
+          {/* 9 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #f97316' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#f97316', marginBottom: 12 }}>fake_listing_ids</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', fontFamily: 'Outfit', marginBottom: 12 }}>17 IDs</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {["100-2000006","100-2001069","100-2002851","DWE-2000195","DWE-2002396","DWE-2004066","MAG-2001236","MAG-2001533","MAG-2002761","MAG-2003644","MAG-2003816","SQU-2000238","SQU-2000270","SQU-2001249","SQU-2001425","ZER-2001598","ZER-2002241"].map(id => (
+                <span key={id} style={{ fontFamily: 'monospace', fontSize: 10, padding: '2px 6px', background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.25)', borderRadius: 4, color: '#f97316' }}>{id}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* 10 */}
+          <div className="glass-card" style={{ padding: 24, borderTop: '3px solid #10b981' }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#10b981', marginBottom: 12 }}>projects_with_wrong_listing_count</div>
+            <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', fontFamily: 'Outfit' }}>363</div>
+          </div>
+
         </div>
 
         {/* Charts */}
